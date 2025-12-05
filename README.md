@@ -33,9 +33,10 @@ The workflow mirrors the diagram you attached: generate plan → split into task
 
 ## Setup
 - Requirements: Python `3.11` (`.python-version`), internet access, Hugging Face account for tokens.
-- Install:
-  - `pip install -e .`
-  - Or use `uv`: `uv pip install -e .`
+- Recommended (uv):
+  - `uv sync` to create `.venv` and install deps from `pyproject.toml`
+  - For editable install: `uv pip install -e .`
+- Fallback (pip): `pip install -e .`
 
 ## Configuration
 - Environment variables (load via `.env` or your shell):
@@ -44,7 +45,7 @@ The workflow mirrors the diagram you attached: generate plan → split into task
 - Model selection: edit `MODEL_ID` and provider values in the files listed under “Models & Providers” to choose the open models you prefer.
 
 ## Run
-- `python main.py`
+- `uv run main.py`
 - Enter your query when prompted. The final consolidated report is written to `research_result.md`.
 
 ## Workflow Diagram
