@@ -1,22 +1,16 @@
-import os
-from huggingface_hub import InferenceClient
+from openai import OpenAI
 from prompts import PLANNER_SYSTEM_INSTRUCTIONS
 
+MODEL = "gpt-5.1-mini"
+
+
 def generate_research_plan(user_query: str) -> str:
-    MODEL_ID = "moonshotai/Kimi-K2-Thinking"
-    PROVIDER = "auto"
-
     print("Generating the research plan for the query: ", user_query)
-    print("MODEL: ", MODEL_ID)
-    print("PROVIDER: ", PROVIDER)
+    print("MODEL: ", MODEL)
 
-    planner_client = InferenceClient(
-        api_key=os.environ["HF_TOKEN"],
-        bill_to="huggingface",
-        provider=PROVIDER,
-    )
-    completion = planner_client.chat.completions.create(
-        model=MODEL_ID,
+    client = OpenAI()
+    completion = client.chat.completions.create(
+        model=MODEL,
         messages=[
             {"role": "system", "content": PLANNER_SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": user_query},
@@ -27,25 +21,11 @@ def generate_research_plan(user_query: str) -> str:
     print("\033[93mGenerated Research Plan:\033[0m")
     research_plan = ""
 
-    def _content(obj):
-        try:
-            return obj.choices[0].delta.content
-        except Exception:
-            try:
-                return obj.choices[0].message.content
-            except Exception:
-                return None
+    for chunk in completion:
+        content = chunk.choices[0].delta.content
+        if content:
+            research_plan += content
+            print(content, end="", flush=True)
 
-    try:
-        for chunk in completion:
-            c = _content(chunk)
-            if c:
-                research_plan += c
-                print(c, end="")
-    except TypeError:
-        c = _content(completion)
-        if c:
-            research_plan = c
-            print(c, end="")
-
+    print()
     return research_plan

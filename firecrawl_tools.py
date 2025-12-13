@@ -1,7 +1,7 @@
-"""Firecrawl tools for web search and scraping using smolagents."""
+"""Firecrawl tools for web search and scraping using OpenAI Agents SDK."""
 
 import os
-from smolagents import tool
+from agents import function_tool
 from firecrawl import Firecrawl
 
 _client: Firecrawl | None = None
@@ -17,7 +17,7 @@ def _get_client() -> Firecrawl:
     return _client
 
 
-@tool
+@function_tool
 def search_web(query: str, limit: int = 5) -> str:
     """Search the web for information.
 
@@ -44,7 +44,7 @@ def search_web(query: str, limit: int = 5) -> str:
     return "\n---\n".join(output)
 
 
-@tool
+@function_tool
 def scrape_url(url: str) -> str:
     """Scrape a webpage and return its content as markdown.
 

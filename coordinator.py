@@ -1,14 +1,12 @@
+import json
+from agents import Agent, Runner, function_tool
 from planner import generate_research_plan
 from task_splitter import split_into_subtasks
 from prompts import SUBAGENT_PROMPT_TEMPLATE, COORDINATOR_PROMPT_TEMPLATE
-from smolagents import LiteLLMModel, ToolCallingAgent, tool, InferenceClientModel
 from firecrawl_tools import search_web, scrape_url
-import os
-import json
 
-# You can vary models here:
-COORDINATOR_MODEL_ID = "MiniMaxAI/MiniMax-M1-80k"
-SUBAGENT_MODEL_ID    = "MiniMaxAI/MiniMax-M1-80k"
+MODEL = "gpt-5.1"
+
 
 def run_deep_research(user_query: str) -> str:
     print("Running the deep research...")
@@ -19,81 +17,50 @@ def run_deep_research(user_query: str) -> str:
     # 2) Split into explicit subtasks
     subtasks = split_into_subtasks(research_plan)
 
-    # 3) Coordinator + sub-agents, all sharing the Firecrawl MCP tools
+    # 3) Coordinator + sub-agents
     print("Initializing Coordinator")
-    print("Coordinator Model: ", COORDINATOR_MODEL_ID)
-    print("Subagent Model: ", SUBAGENT_MODEL_ID)
+    print("Model: ", MODEL)
 
-    coordinator_model = InferenceClientModel(
-        model_id=COORDINATOR_MODEL_ID, 
-        api_key=os.environ["HF_TOKEN"],
-        provider="novita",
-        bill_to="huggingface"
-        )
-    subagent_model = InferenceClientModel(
-        model_id=SUBAGENT_MODEL_ID, 
-        api_key=os.environ["HF_TOKEN"],
-        provider="novita",
-        bill_to="huggingface"
-        )
-
-    firecrawl_tools = [search_web, scrape_url]
-
-    # ---- Initialize Subagent TOOL --------------------------------------
-    @tool
+    # Define subagent spawner tool (closure captures context)
+    @function_tool
     def initialize_subagent(subtask_id: str, subtask_title: str, subtask_description: str) -> str:
-        """
-        Spawn a dedicated research sub-agent for a single subtask.
+        """Spawn a dedicated research sub-agent for a single subtask.
 
         Args:
-            subtask_id (str): The unique identifier for the subtask.
-            subtask_title (str): The descriptive title of the subtask.
-            subtask_description (str): Detailed instructions for the sub-agent to perform the subtask.
-
-        The sub-agent:
-        - Has access to search_web and scrape_url tools.
-        - Must perform deep research ONLY on this subtask.
-        - Returns a structured markdown report with:
-          - a clear heading identifying the subtask,
-          - a narrative explanation,
-          - bullet-point key findings,
-          - explicit citations / links to sources.
+            subtask_id: The unique identifier for the subtask.
+            subtask_title: The descriptive title of the subtask.
+            subtask_description: Detailed instructions for the sub-agent to perform the subtask.
         """
         print(f"Initializing Subagent for task {subtask_id}...")
 
-        subagent = ToolCallingAgent(
-            tools=firecrawl_tools,
-            model=subagent_model,
-            add_base_tools=False,
+        subagent = Agent(
             name=f"subagent_{subtask_id}",
+            instructions=SUBAGENT_PROMPT_TEMPLATE.format(
+                user_query=user_query,
+                research_plan=research_plan,
+                subtask_id=subtask_id,
+                subtask_title=subtask_title,
+                subtask_description=subtask_description,
+            ),
+            model=MODEL,
+            tools=[search_web, scrape_url],
         )
 
-        subagent_prompt = SUBAGENT_PROMPT_TEMPLATE.format(
+        result = Runner.run_sync(subagent, f"Execute research for: {subtask_title}")
+        return result.final_output
+
+    # Create coordinator agent
+    coordinator = Agent(
+        name="coordinator_agent",
+        instructions=COORDINATOR_PROMPT_TEMPLATE.format(
             user_query=user_query,
             research_plan=research_plan,
-            subtask_id=subtask_id,
-            subtask_title=subtask_title,
-            subtask_description=subtask_description,
-        )
-
-        return subagent.run(subagent_prompt)
-
-    # ---- Coordinator agent ---------------------------------------------
-    coordinator = ToolCallingAgent(
+            subtasks_json=json.dumps(subtasks, indent=2, ensure_ascii=False),
+        ),
+        model=MODEL,
         tools=[initialize_subagent],
-        model=coordinator_model,
-        add_base_tools=False,
-        name="coordinator_agent",
     )
 
-    # Coordinator prompt: it gets the list of subtasks and the tool
-    subtasks_json = json.dumps(subtasks, indent=2, ensure_ascii=False)
-
-    coordinator_prompt = COORDINATOR_PROMPT_TEMPLATE.format(
-        user_query=user_query,
-        research_plan=research_plan,
-        subtasks_json=subtasks_json,
-    )
-
-    final_report = coordinator.run(coordinator_prompt)
-    return final_report
+    # Run coordinator
+    result = Runner.run_sync(coordinator, "Execute the research plan by delegating to subagents")
+    return result.final_output

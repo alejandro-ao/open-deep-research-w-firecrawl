@@ -1,12 +1,13 @@
 [project]
-name = "firecrawl-smolagents-deep-research"
+name = "openai-agents-deep-research"
 version = "0.1.0"
-description = "Add your description here"
+description = "Multi-agent deep research using OpenAI Agents SDK"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "python-dotenv>=1.2.1",
-    "smolagents[litellm,openai]>=1.23.0",
+    "openai-agents>=0.0.16",
+    "openai>=1.0.0",
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "firecrawl-py>=1.0.0",

@@ -1,10 +1,10 @@
-import os
-import json
 from typing import List
 from pydantic import BaseModel, Field
-
-from huggingface_hub import InferenceClient
+from openai import OpenAI
 from prompts import TASK_SPLITTER_SYSTEM_INSTRUCTIONS
+
+MODEL = "gpt-5.1-mini"
+
 
 class Subtask(BaseModel):
     id: str = Field(
@@ -20,51 +20,35 @@ class Subtask(BaseModel):
         description="Clear, detailed instructions for the sub-agent that will research this subtask.",
     )
 
+
 class SubtaskList(BaseModel):
     subtasks: List[Subtask] = Field(
         ...,
         description="List of subtasks that together cover the whole research plan.",
     )
 
-TASK_SPLITTER_JSON_SCHEMA = {
-    "name": "subtaskList",
-    "schema": SubtaskList.model_json_schema(),
-    "strict": True,
-}
 
-def split_into_subtasks(research_plan: str) -> List[Subtask]:
-
-    MODEL_ID = "deepseek-ai/DeepSeek-V3.2-Exp"
-    PROVIDER = "novita"
-    
+def split_into_subtasks(research_plan: str) -> List[dict]:
     print("Splitting the research plan into subtasks...")
-    print("MODEL: ", MODEL_ID)
-    print("PROVIDER: ", PROVIDER)
-    
-    client = InferenceClient(
-        api_key=os.environ["HF_TOKEN"],
-        bill_to="huggingface",
-        provider=PROVIDER,
-    )
-    completion = client.chat.completions.create(
-        model=MODEL_ID,
+    print("MODEL: ", MODEL)
+
+    client = OpenAI()
+    completion = client.beta.chat.completions.parse(
+        model=MODEL,
         messages=[
             {"role": "system", "content": TASK_SPLITTER_SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": research_plan},
         ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": TASK_SPLITTER_JSON_SCHEMA,
-        }
+        response_format=SubtaskList,
     )
 
-    message = completion.choices[0].message
+    parsed = completion.choices[0].message.parsed
+    subtasks = [s.model_dump() for s in parsed.subtasks]
 
-    subtasks = json.loads(message.content)['subtasks']
-
-    print("\033[93mGenerated The Following Subtasks\033[0m")
+    print("\033[93mGenerated The Following Subtasks:\033[0m")
     for task in subtasks:
-      print(f"\033[93m{task['title']}\033[0m")
-      print(f"\033[93m{task['description']}\033[0m")
-      print()
+        print(f"\033[93m{task['title']}\033[0m")
+        print(f"\033[93m{task['description']}\033[0m")
+        print()
+
     return subtasks
