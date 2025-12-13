@@ -1,12 +1,10 @@
 from planner import generate_research_plan
 from task_splitter import split_into_subtasks
 from prompts import SUBAGENT_PROMPT_TEMPLATE, COORDINATOR_PROMPT_TEMPLATE
-from smolagents import LiteLLMModel, ToolCallingAgent, MCPClient, tool, InferenceClientModel
+from smolagents import LiteLLMModel, ToolCallingAgent, tool, InferenceClientModel
+from firecrawl_tools import search_web, scrape_url
 import os
 import json
-
-FIRECRAWL_API_KEY = os.environ["FIRECRAWL_API_KEY"]
-MCP_URL = f"https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp"
 
 # You can vary models here:
 COORDINATOR_MODEL_ID = "MiniMaxAI/MiniMax-M1-80k"
@@ -39,63 +37,63 @@ def run_deep_research(user_query: str) -> str:
         bill_to="huggingface"
         )
 
-    with MCPClient({"url": MCP_URL, "transport": "streamable-http"}) as mcp_tools:
+    firecrawl_tools = [search_web, scrape_url]
 
-        # ---- Initialize Subagent TOOL --------------------------------------
-        @tool
-        def initialize_subagent(subtask_id: str, subtask_title: str, subtask_description: str) -> str:
-            """
-           Spawn a dedicated research sub-agent for a single subtask.
+    # ---- Initialize Subagent TOOL --------------------------------------
+    @tool
+    def initialize_subagent(subtask_id: str, subtask_title: str, subtask_description: str) -> str:
+        """
+        Spawn a dedicated research sub-agent for a single subtask.
 
-            Args:
-                subtask_id (str): The unique identifier for the subtask.
-                subtask_title (str): The descriptive title of the subtask.
-                subtask_description (str): Detailed instructions for the sub-agent to perform the subtask.
+        Args:
+            subtask_id (str): The unique identifier for the subtask.
+            subtask_title (str): The descriptive title of the subtask.
+            subtask_description (str): Detailed instructions for the sub-agent to perform the subtask.
 
-            The sub-agent:
-            - Has access to the Firecrawl MCP tools.
-            - Must perform deep research ONLY on this subtask.
-            - Returns a structured markdown report with:
-              - a clear heading identifying the subtask,
-              - a narrative explanation,
-              - bullet-point key findings,
-              - explicit citations / links to sources.
-            """
-            print(f"Initializing Subagent for task {subtask_id}...")
+        The sub-agent:
+        - Has access to search_web and scrape_url tools.
+        - Must perform deep research ONLY on this subtask.
+        - Returns a structured markdown report with:
+          - a clear heading identifying the subtask,
+          - a narrative explanation,
+          - bullet-point key findings,
+          - explicit citations / links to sources.
+        """
+        print(f"Initializing Subagent for task {subtask_id}...")
 
-            subagent = ToolCallingAgent(
-                tools=mcp_tools,                # Firecrawl MCP toolkit
-                model=subagent_model,
-                add_base_tools=False,
-                name=f"subagent_{subtask_id}",
-            )
-
-            subagent_prompt = SUBAGENT_PROMPT_TEMPLATE.format(
-                user_query=user_query,
-                research_plan=research_plan,
-                subtask_id=subtask_id,
-                subtask_title=subtask_title,
-                subtask_description=subtask_description,
-            )
-            
-            return subagent.run(subagent_prompt)
-
-        # ---- Coordinator agent ---------------------------------------------
-        coordinator = ToolCallingAgent(
-            tools=[initialize_subagent],
-            model=coordinator_model,
+        subagent = ToolCallingAgent(
+            tools=firecrawl_tools,
+            model=subagent_model,
             add_base_tools=False,
-            name="coordinator_agent",
+            name=f"subagent_{subtask_id}",
         )
 
-        # Coordinator prompt: it gets the list of subtasks and the tool
-        subtasks_json = json.dumps(subtasks, indent=2, ensure_ascii=False)
-
-        coordinator_prompt = COORDINATOR_PROMPT_TEMPLATE.format(
+        subagent_prompt = SUBAGENT_PROMPT_TEMPLATE.format(
             user_query=user_query,
             research_plan=research_plan,
-            subtasks_json=subtasks_json,
+            subtask_id=subtask_id,
+            subtask_title=subtask_title,
+            subtask_description=subtask_description,
         )
 
-        final_report = coordinator.run(coordinator_prompt)
-        return final_report
+        return subagent.run(subagent_prompt)
+
+    # ---- Coordinator agent ---------------------------------------------
+    coordinator = ToolCallingAgent(
+        tools=[initialize_subagent],
+        model=coordinator_model,
+        add_base_tools=False,
+        name="coordinator_agent",
+    )
+
+    # Coordinator prompt: it gets the list of subtasks and the tool
+    subtasks_json = json.dumps(subtasks, indent=2, ensure_ascii=False)
+
+    coordinator_prompt = COORDINATOR_PROMPT_TEMPLATE.format(
+        user_query=user_query,
+        research_plan=research_plan,
+        subtasks_json=subtasks_json,
+    )
+
+    final_report = coordinator.run(coordinator_prompt)
+    return final_report
