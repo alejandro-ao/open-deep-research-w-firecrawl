@@ -7,4 +7,6 @@ requires-python = ">=3.11"
 dependencies = [
     "python-dotenv>=1.2.1",
     "smolagents[litellm,mcp,openai]>=1.23.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
 ]
