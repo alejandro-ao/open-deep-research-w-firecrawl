@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from huggingface_hub import InferenceClient
 from prompts import TASK_SPLITTER_SYSTEM_INSTRUCTIONS
+from config import TASK_SPLITTER_MODEL_ID, TASK_SPLITTER_PROVIDER, BILL_TO
 
 class Subtask(BaseModel):
     id: str = Field(
@@ -33,21 +34,17 @@ TASK_SPLITTER_JSON_SCHEMA = {
 }
 
 def split_into_subtasks(research_plan: str) -> List[Subtask]:
-
-    MODEL_ID = "deepseek-ai/DeepSeek-V3.2-Exp"
-    PROVIDER = "novita"
-    
     print("Splitting the research plan into subtasks...")
-    print("MODEL: ", MODEL_ID)
-    print("PROVIDER: ", PROVIDER)
-    
+    print("MODEL: ", TASK_SPLITTER_MODEL_ID)
+    print("PROVIDER: ", TASK_SPLITTER_PROVIDER)
+
     client = InferenceClient(
         api_key=os.environ["HF_TOKEN"],
-        bill_to="huggingface",
-        provider=PROVIDER,
+        bill_to=BILL_TO,
+        provider=TASK_SPLITTER_PROVIDER,
     )
     completion = client.chat.completions.create(
-        model=MODEL_ID,
+        model=TASK_SPLITTER_MODEL_ID,
         messages=[
             {"role": "system", "content": TASK_SPLITTER_SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": research_plan},

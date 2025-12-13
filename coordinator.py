@@ -1,14 +1,15 @@
 from planner import generate_research_plan
 from task_splitter import split_into_subtasks
 from prompts import SUBAGENT_PROMPT_TEMPLATE, COORDINATOR_PROMPT_TEMPLATE
+from config import (
+    COORDINATOR_MODEL_ID, COORDINATOR_PROVIDER,
+    SUBAGENT_MODEL_ID, SUBAGENT_PROVIDER,
+    BILL_TO,
+)
 from smolagents import LiteLLMModel, ToolCallingAgent, tool, InferenceClientModel
 from firecrawl_tools import search_web, scrape_url
 import os
 import json
-
-# You can vary models here:
-COORDINATOR_MODEL_ID = "MiniMaxAI/MiniMax-M1-80k"
-SUBAGENT_MODEL_ID    = "MiniMaxAI/MiniMax-M1-80k"
 
 def run_deep_research(user_query: str) -> str:
     print("Running the deep research...")
@@ -25,17 +26,17 @@ def run_deep_research(user_query: str) -> str:
     print("Subagent Model: ", SUBAGENT_MODEL_ID)
 
     coordinator_model = InferenceClientModel(
-        model_id=COORDINATOR_MODEL_ID, 
+        model_id=COORDINATOR_MODEL_ID,
         api_key=os.environ["HF_TOKEN"],
-        provider="novita",
-        bill_to="huggingface"
-        )
+        provider=COORDINATOR_PROVIDER,
+        bill_to=BILL_TO,
+    )
     subagent_model = InferenceClientModel(
-        model_id=SUBAGENT_MODEL_ID, 
+        model_id=SUBAGENT_MODEL_ID,
         api_key=os.environ["HF_TOKEN"],
-        provider="novita",
-        bill_to="huggingface"
-        )
+        provider=SUBAGENT_PROVIDER,
+        bill_to=BILL_TO,
+    )
 
     firecrawl_tools = [search_web, scrape_url]
 

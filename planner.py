@@ -1,22 +1,20 @@
 import os
 from huggingface_hub import InferenceClient
 from prompts import PLANNER_SYSTEM_INSTRUCTIONS
+from config import PLANNER_MODEL_ID, PLANNER_PROVIDER, BILL_TO
 
 def generate_research_plan(user_query: str) -> str:
-    MODEL_ID = "moonshotai/Kimi-K2-Thinking"
-    PROVIDER = "auto"
-
     print("Generating the research plan for the query: ", user_query)
-    print("MODEL: ", MODEL_ID)
-    print("PROVIDER: ", PROVIDER)
+    print("MODEL: ", PLANNER_MODEL_ID)
+    print("PROVIDER: ", PLANNER_PROVIDER)
 
     planner_client = InferenceClient(
         api_key=os.environ["HF_TOKEN"],
-        bill_to="huggingface",
-        provider=PROVIDER,
+        bill_to=BILL_TO,
+        provider=PLANNER_PROVIDER,
     )
     completion = planner_client.chat.completions.create(
-        model=MODEL_ID,
+        model=PLANNER_MODEL_ID,
         messages=[
             {"role": "system", "content": PLANNER_SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": user_query},
