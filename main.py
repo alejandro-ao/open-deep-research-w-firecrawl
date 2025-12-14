@@ -1,9 +1,11 @@
 import argparse
+import asyncio
 from coordinator import run_deep_research
 from dotenv import load_dotenv
 import os
 
-def main():
+
+async def main():
     load_dotenv()
 
     parser = argparse.ArgumentParser(
@@ -19,7 +21,7 @@ def main():
     # Use CLI arg or fall back to interactive prompt
     user_query = args.query or input("Enter your research query: ")
 
-    result = run_deep_research(user_query)
+    result = await run_deep_research(user_query)
     os.makedirs("results", exist_ok=True)
     with open("results/research_result.md", "w") as f:
         f.write(result)
@@ -27,4 +29,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

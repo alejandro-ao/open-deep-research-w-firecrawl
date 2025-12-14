@@ -1,7 +1,7 @@
 from openai import OpenAI
 from prompts import PLANNER_SYSTEM_INSTRUCTIONS
 
-MODEL = "gpt-5.1-mini"
+MODEL = "gpt-5-mini-2025-08-07"
 
 
 def generate_research_plan(user_query: str) -> str:

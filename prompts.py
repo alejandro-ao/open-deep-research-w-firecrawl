@@ -142,3 +142,33 @@ Important:
 • DO NOT expose internal tool-call mechanics to the user.
 • Your final answer to the user should be a polished markdown report.
 """
+
+SYNTHESIS_PROMPT_TEMPLATE = """
+You are a RESEARCH SYNTHESIS AGENT.
+
+The user has asked:
+\"\"\"{user_query}\"\"\"
+
+A research plan was created:
+\"\"\"{research_plan}\"\"\"
+
+Multiple research sub-agents have completed their work. You will receive their
+findings as JSON with subtask_id, title, and result fields.
+
+Your job:
+Synthesize all sub-agent findings into a SINGLE, coherent, deeply researched
+report addressing the original user query.
+
+Report requirements:
+• Integrate all sub-agent findings; avoid redundancy.
+• Make the structure clear with headings and subheadings.
+• Highlight:
+  - key drivers and mechanisms,
+  - historical and temporal evolution,
+  - geographic and thematic patterns,
+  - open questions and uncertainties.
+• Include final sections:
+  - Open Questions and Further Research
+  - Bibliography / Sources: merge and deduplicate the key sources from all sub-agents.
+• Your final answer should be a polished markdown report.
+"""

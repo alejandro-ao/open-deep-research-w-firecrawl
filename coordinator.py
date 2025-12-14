@@ -1,14 +1,37 @@
 import json
-from agents import Agent, Runner, function_tool
+import asyncio
+from agents import Agent, Runner, AgentHooks, RunContextWrapper, Tool
+from rich.console import Console
 from planner import generate_research_plan
 from task_splitter import split_into_subtasks
-from prompts import SUBAGENT_PROMPT_TEMPLATE, COORDINATOR_PROMPT_TEMPLATE
+from prompts import SUBAGENT_PROMPT_TEMPLATE, SYNTHESIS_PROMPT_TEMPLATE
 from firecrawl_tools import search_web, scrape_url
 
 MODEL = "gpt-5.1"
+console = Console()
 
 
-def run_deep_research(user_query: str) -> str:
+class SubagentLoggingHooks(AgentHooks):
+    """Hooks to log subagent tool activity."""
+
+    def __init__(self, subtask_id: str):
+        self.subtask_id = subtask_id
+
+    async def on_tool_start(
+        self, context: RunContextWrapper, agent: Agent, tool: Tool
+    ) -> None:
+        console.print(f"  [cyan][{self.subtask_id}][/cyan] [dim]-> calling:[/dim] [yellow]{tool.name}[/yellow]")
+
+    async def on_tool_end(
+        self, context: RunContextWrapper, agent: Agent, tool: Tool, result: str
+    ) -> None:
+        # preview = result[:80] + "..." if len(result) > 80 else result
+        # preview = preview.replace("\n", " ")
+        preview = result
+        console.print(f"  [cyan][{self.subtask_id}][/cyan] [dim]<- result:[/dim] [dim]{preview}[/dim]")
+
+
+async def run_deep_research(user_query: str) -> str:
     print("Running the deep research...")
 
     # 1) Generate research plan
@@ -17,21 +40,16 @@ def run_deep_research(user_query: str) -> str:
     # 2) Split into explicit subtasks
     subtasks = split_into_subtasks(research_plan)
 
-    # 3) Coordinator + sub-agents
-    print("Initializing Coordinator")
+    # 3) Run all subagents concurrently
+    print("Initializing Subagents")
     print("Model: ", MODEL)
 
-    # Define subagent spawner tool (closure captures context)
-    @function_tool
-    def initialize_subagent(subtask_id: str, subtask_title: str, subtask_description: str) -> str:
-        """Spawn a dedicated research sub-agent for a single subtask.
+    async def run_single_subagent(subtask: dict) -> dict:
+        subtask_id = subtask["id"]
+        subtask_title = subtask["title"]
+        subtask_description = subtask["description"]
 
-        Args:
-            subtask_id: The unique identifier for the subtask.
-            subtask_title: The descriptive title of the subtask.
-            subtask_description: Detailed instructions for the sub-agent to perform the subtask.
-        """
-        print(f"Initializing Subagent for task {subtask_id}...")
+        print(f"Starting Subagent for task {subtask_id}...")
 
         subagent = Agent(
             name=f"subagent_{subtask_id}",
@@ -44,23 +62,27 @@ def run_deep_research(user_query: str) -> str:
             ),
             model=MODEL,
             tools=[search_web, scrape_url],
+            hooks=SubagentLoggingHooks(subtask_id),
         )
 
-        result = Runner.run_sync(subagent, f"Execute research for: {subtask_title}")
-        return result.final_output
+        result = await Runner.run(subagent, f"Execute research for: {subtask_title}")
+        print(f"Completed Subagent for task {subtask_id}")
+        return {"subtask_id": subtask_id, "title": subtask_title, "result": result.final_output}
 
-    # Create coordinator agent
-    coordinator = Agent(
-        name="coordinator_agent",
-        instructions=COORDINATOR_PROMPT_TEMPLATE.format(
+    print(f"Running {len(subtasks)} subagents concurrently...")
+    subagent_results = await asyncio.gather(*[run_single_subagent(st) for st in subtasks])
+
+    # 4) Synthesize results with a final agent
+    print("Synthesizing results...")
+    synthesizer = Agent(
+        name="synthesizer_agent",
+        instructions=SYNTHESIS_PROMPT_TEMPLATE.format(
             user_query=user_query,
             research_plan=research_plan,
-            subtasks_json=json.dumps(subtasks, indent=2, ensure_ascii=False),
         ),
         model=MODEL,
-        tools=[initialize_subagent],
     )
 
-    # Run coordinator
-    result = Runner.run_sync(coordinator, "Execute the research plan by delegating to subagents")
+    synthesis_input = json.dumps(subagent_results, indent=2, ensure_ascii=False)
+    result = await Runner.run(synthesizer, f"Synthesize these research results:\n{synthesis_input}")
     return result.final_output

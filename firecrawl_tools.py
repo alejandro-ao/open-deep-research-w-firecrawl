@@ -28,17 +28,29 @@ def search_web(query: str, limit: int = 5) -> str:
     client = _get_client()
     results = client.search(query=query, limit=limit)
 
-    if not results or not results.data:
+    if not results:
+        return "No results found."
+
+    items = results.web if hasattr(results, "web") and results.web else None
+
+    if not items:
         return "No results found."
 
     output = []
-    for item in results.data:
-        title = item.title or "No title"
-        url = item.url or ""
-        markdown = getattr(item, "markdown", "") or ""
-        if markdown:
-            markdown = markdown[:500]
-        description = getattr(item, "description", "") or ""
+    for item in items:
+        # Handle both object and dict access
+        if isinstance(item, dict):
+            title = item.get("title", "No title")
+            url = item.get("url", "")
+            markdown = item.get("markdown", "")[:500] if item.get("markdown") else ""
+            description = item.get("description", "")
+        else:
+            title = getattr(item, "title", "No title") or "No title"
+            url = getattr(item, "url", "") or ""
+            markdown = getattr(item, "markdown", "") or ""
+            if markdown:
+                markdown = markdown[:500]
+            description = getattr(item, "description", "") or ""
         output.append(f"## {title}\nURL: {url}\n{description}\n{markdown}\n")
 
     return "\n---\n".join(output)

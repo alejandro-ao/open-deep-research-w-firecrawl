@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from openai import OpenAI
 from prompts import TASK_SPLITTER_SYSTEM_INSTRUCTIONS
 
-MODEL = "gpt-5.1-mini"
+MODEL = "gpt-5-mini-2025-08-07"
 
 
 class Subtask(BaseModel):
