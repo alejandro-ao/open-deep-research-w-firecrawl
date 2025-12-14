@@ -1,15 +1,15 @@
 from planner import generate_research_plan
 from task_splitter import split_into_subtasks
-from prompts import SUBAGENT_PROMPT_TEMPLATE, COORDINATOR_PROMPT_TEMPLATE
+from prompts import SUBAGENT_PROMPT_TEMPLATE, SYNTHESIS_PROMPT_TEMPLATE
 from config import (
     COORDINATOR_MODEL_ID, COORDINATOR_PROVIDER,
     SUBAGENT_MODEL_ID, SUBAGENT_PROVIDER,
     BILL_TO,
 )
-from smolagents import LiteLLMModel, ToolCallingAgent, tool, InferenceClientModel
+from smolagents import ToolCallingAgent, InferenceClientModel
 from firecrawl_tools import search_web, scrape_url
 import os
-import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def run_deep_research(user_query: str) -> str:
     print("Running the deep research...")
@@ -40,27 +40,14 @@ def run_deep_research(user_query: str) -> str:
 
     firecrawl_tools = [search_web, scrape_url]
 
-    # ---- Initialize Subagent TOOL --------------------------------------
-    @tool
-    def initialize_subagent(subtask_id: str, subtask_title: str, subtask_description: str) -> str:
-        """
-        Spawn a dedicated research sub-agent for a single subtask.
+    # ---- Run single subagent (for concurrent execution) ----------------
+    def run_subagent(subtask: dict) -> dict:
+        """Run a single subagent and return its result with metadata."""
+        subtask_id = subtask["id"]
+        subtask_title = subtask["title"]
+        subtask_description = subtask["description"]
 
-        Args:
-            subtask_id (str): The unique identifier for the subtask.
-            subtask_title (str): The descriptive title of the subtask.
-            subtask_description (str): Detailed instructions for the sub-agent to perform the subtask.
-
-        The sub-agent:
-        - Has access to search_web and scrape_url tools.
-        - Must perform deep research ONLY on this subtask.
-        - Returns a structured markdown report with:
-          - a clear heading identifying the subtask,
-          - a narrative explanation,
-          - bullet-point key findings,
-          - explicit citations / links to sources.
-        """
-        print(f"Initializing Subagent for task {subtask_id}...")
+        print(f"[Subagent {subtask_id}] Starting...")
 
         subagent = ToolCallingAgent(
             tools=firecrawl_tools,
@@ -77,24 +64,56 @@ def run_deep_research(user_query: str) -> str:
             subtask_description=subtask_description,
         )
 
-        return subagent.run(subagent_prompt)
+        result = subagent.run(subagent_prompt)
+        print(f"[Subagent {subtask_id}] Completed")
 
-    # ---- Coordinator agent ---------------------------------------------
-    coordinator = ToolCallingAgent(
-        tools=[initialize_subagent],
-        model=coordinator_model,
-        add_base_tools=False,
-        name="coordinator_agent",
-    )
+        return {
+            "id": subtask_id,
+            "title": subtask_title,
+            "result": result
+        }
 
-    # Coordinator prompt: it gets the list of subtasks and the tool
-    subtasks_json = json.dumps(subtasks, indent=2, ensure_ascii=False)
+    # ---- Run all subagents concurrently --------------------------------
+    print(f"Running {len(subtasks)} subagents concurrently...")
+    subagent_results = []
 
-    coordinator_prompt = COORDINATOR_PROMPT_TEMPLATE.format(
+    with ThreadPoolExecutor(max_workers=len(subtasks)) as executor:
+        futures = {executor.submit(run_subagent, subtask): subtask for subtask in subtasks}
+
+        for future in as_completed(futures):
+            subtask = futures[future]
+            try:
+                result = future.result()
+                subagent_results.append(result)
+            except Exception as e:
+                print(f"[Subagent {subtask['id']}] Failed: {e}")
+                subagent_results.append({
+                    "id": subtask["id"],
+                    "title": subtask["title"],
+                    "result": f"Error: {str(e)}"
+                })
+
+    # Sort results by subtask ID to maintain consistent order
+    subagent_results.sort(key=lambda x: x["id"])
+
+    # ---- Synthesize results with coordinator model ---------------------
+    print("Synthesizing results...")
+
+    # Combine all subagent reports
+    combined_reports = "\n\n---\n\n".join([
+        f"## Subtask: {r['title']} (ID: {r['id']})\n\n{r['result']}"
+        for r in subagent_results
+    ])
+
+    synthesis_prompt = SYNTHESIS_PROMPT_TEMPLATE.format(
         user_query=user_query,
         research_plan=research_plan,
-        subtasks_json=subtasks_json,
+        combined_reports=combined_reports,
     )
 
-    final_report = coordinator.run(coordinator_prompt)
+    # Use coordinator model for synthesis (simple completion, no tools needed)
+    final_report = coordinator_model(
+        [{"role": "user", "content": synthesis_prompt}]
+    ).content
+
     return final_report
