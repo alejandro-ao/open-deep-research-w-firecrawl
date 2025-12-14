@@ -28,11 +28,13 @@ def search_web(query: str, limit: int = 5) -> str:
     client = _get_client()
     results = client.search(query=query, limit=limit)
 
-    if not results or not results.data:
+    # SearchData has .web, .news, .images attributes
+    items = getattr(results, "web", None) or []
+    if not items:
         return "No results found."
 
     output = []
-    for item in results.data:
+    for item in items:
         title = item.title or "No title"
         url = item.url or ""
         markdown = getattr(item, "markdown", "") or ""

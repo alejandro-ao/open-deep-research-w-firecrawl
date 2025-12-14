@@ -54,6 +54,7 @@ def run_deep_research(user_query: str) -> str:
             model=subagent_model,
             add_base_tools=False,
             name=f"subagent_{subtask_id}",
+            # max_steps=5,
         )
 
         subagent_prompt = SUBAGENT_PROMPT_TEMPLATE.format(

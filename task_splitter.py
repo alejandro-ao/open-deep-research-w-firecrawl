@@ -55,7 +55,17 @@ def split_into_subtasks(research_plan: str) -> List[Subtask]:
         }
     )
 
+    print("RAW COMPLETION OBJECT:", completion)
     message = completion.choices[0].message
+    print("MESSAGE ROLE:", getattr(message, "role", None))
+    print("MESSAGE CONTENT (first 1000 chars):", (getattr(message, "content", None) or "")[:1000])
+    parsed_payload = getattr(message, "parsed", None)
+    if parsed_payload is not None:
+        try:
+            print("MESSAGE PARSED KEYS:", list(parsed_payload.keys()))
+            print("MESSAGE PARSED JSON (first 2000 chars):", json.dumps(parsed_payload, indent=2, ensure_ascii=False)[:2000])
+        except Exception:
+            print("MESSAGE PARSED REPR (first 2000 chars):", repr(parsed_payload)[:2000])
 
     subtasks = json.loads(message.content)['subtasks']
 
