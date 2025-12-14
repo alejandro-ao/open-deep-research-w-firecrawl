@@ -54,7 +54,7 @@ def scrape_url(url: str) -> str:
         url: The URL to scrape.
     """
     client = _get_client()
-    result = client.scrape_url(url=url, formats=["markdown"])
+    result = client.scrape(url, formats=["markdown"])
 
     if not result or not result.markdown:
         return f"Failed to scrape {url}"
