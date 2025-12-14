@@ -1,63 +1,75 @@
-# Firecrawl + Smolagents Deep Research (Multi‑Agent)
+# Firecrawl + OpenAI Agents Deep Research (Multi‑Agent)
 
 Deep‑research system that takes a user query, plans the work, splits it into focused subtasks, and orchestrates specialized sub‑agents to investigate each part. A coordinator agent synthesizes all findings into a single, well‑structured report.
 
-The workflow mirrors the diagram you attached: generate plan → split into tasks → coordinator spawns sub‑agents → sub‑agents research → coordinator aggregates → final result.
+The workflow mirrors the included diagram: generate plan → split into tasks → coordinator spawns sub‑agents → sub‑agents research → coordinator aggregates → final result.
 
 ## Highlights
-- Built on `smolagents` (by Hugging Face) for agent orchestration and tool calling.
-- All LLM calls run via Hugging Face Inference Providers using open models.
-- Uses Firecrawl MCP tools for web research and retrieval.
-- Produces a consolidated markdown report saved to `research_result.md`.
+- Built on the **OpenAI Agents SDK** for orchestration and tool calling (sub‑agents and synthesis run through `LitellmModel`).
+- LLM calls honor `OPENAI_BASE_URL` / `LITELLM_BASE_URL` so you can route to a LiteLLM proxy (e.g., Hugging Face models) or use OpenAI directly.
+- Firecrawl tools (`search_web`, `scrape_url`) are **implemented in-repo** (`firecrawl_tools.py`) rather than pulled from an MCP server.
+- Produces a consolidated markdown report saved to `results/research_result.md`.
 
 ## How It Works
-- Plan generation: `planner.py:5` creates a high‑level research plan using an HF Inference model.
-- Task splitting: `task_splitter.py:35` turns the plan into clear, non‑overlapping subtasks (JSON schema enforced).
-- Coordinator: `coordinator.py:15` orchestrates the workflow and exposes the tool `initialize_subagent(...)` to spawn focused sub‑agents with shared MCP tools.
-- Sub‑agents: created inside `coordinator.py:46`, each runs a targeted prompt and returns a markdown report.
+- Plan generation: `planner.py` streams a high‑level research plan using an OpenAI chat model.
+- Task splitting: `task_splitter.py` converts the plan into non‑overlapping subtasks (parsed via Pydantic schema).
+- Coordinator: `coordinator.py` orchestrates all steps, spawns sub‑agents, shares Firecrawl tools, and logs tool calls.
+- Sub‑agents: each runs a targeted prompt and returns a markdown report.
 - Synthesis: the coordinator gathers all sub‑agent outputs and creates the final report.
 
-![Open Deep Research Workflow Diagram](docs/open-deep-research-workflow-diagram.png)
-
 ## Models & Providers
-- Models are configured in code and executed via Hugging Face Inference Providers.
-- Defaults demonstrate open‑model usage (e.g., `deepseek-ai/*`) and can be changed by editing the `MODEL_ID` constants:
-  - Planner: `planner.py:6`
-  - Task splitter: `task_splitter.py:37`
-  - Coordinator/Sub‑agents: `coordinator.py:12` and `coordinator.py:13`
-- Pick any open model available through HF providers (examples: `deepseek-ai/DeepSeek-R1`, `Qwen/Qwen2.5-32B-Instruct`, `tiiuae/falcon-40b-instruct`).
+- Planner model: `planner.py` (`MODEL = "gpt-5-mini-2025-08-07"`).
+- Task splitter model: `task_splitter.py` (`MODEL = "gpt-5-mini-2025-08-07"`).
+- Coordinator/Sub‑agents model: `coordinator.py` (`MODEL = "gpt-5.1"` via `LitellmModel`).
+- Swap these via env vars: `PLANNER_MODEL`, `TASK_SPLITTER_MODEL`, `COORDINATOR_MODEL`.
 
-## Firecrawl MCP Tools
-- Configured in `coordinator.py:8`–`coordinator.py:9` and shared with all agents via `MCPClient`.
-- Provide powerful search, crawl, and retrieval capabilities used during sub‑agent research.
+## Firecrawl Tools
+- Implemented locally in `firecrawl_tools.py` using the Firecrawl Python SDK.
+- Exposed to agents as OpenAI function tools (`search_web`, `scrape_url`) and shared across all sub‑agents.
 
 ## Setup
-- Requirements: Python `3.11` (`.python-version`), internet access, Hugging Face account for tokens.
+- Requirements: Python `3.11` (`.python-version`), internet access, OpenAI API access, Firecrawl API key.
 - Recommended (uv):
   - `uv sync` to create `.venv` and install deps from `pyproject.toml`
   - For editable install: `uv pip install -e .`
 - Fallback (pip): `pip install -e .`
 
 ## Configuration
-- Environment variables (load via `.env` or your shell):
-  - `HF_TOKEN`: Hugging Face token used by all LLM calls (`planner.py:14`, `task_splitter.py:45`, `coordinator.py:31` and `coordinator.py:37`).
-  - `FIRECRAWL_API_KEY`: API key for Firecrawl MCP (`coordinator.py:8`).
-- Model selection: edit `MODEL_ID` and provider values in the files listed under “Models & Providers” to choose the open models you prefer.
+- Environment variables (see `.env.example`):
+  - `OPENAI_API_KEY`: used by planner/task splitter (OpenAI client).
+  - `FIRECRAWL_API_KEY`: required for Firecrawl tools.
+  - `LITELLM_API_KEY`: optional; used by Agents SDK when talking through `LitellmModel` (defaults to `OPENAI_API_KEY` or `HF_TOKEN`).
+  - `OPENAI_BASE_URL`: optional; set to your LiteLLM proxy so planner/splitter route through it.
+  - `LITELLM_BASE_URL`: optional; set to the same proxy so Agents use it.
+- Model selection: edit the `MODEL` constants or set env vars above.
+
+## Using Hugging Face models via LiteLLM (Agents SDK integration)
+1) Start a LiteLLM proxy that targets a HF Inference endpoint (see LiteLLM docs for flags; example command in their README).  
+2) Export environment for this project:
+```bash
+export OPENAI_BASE_URL=http://localhost:4000      # planner/task splitter
+export OPENAI_API_KEY=proxy-key                   # value expected by your proxy
+export LITELLM_BASE_URL=http://localhost:4000     # Agents SDK (sub‑agents/synth)
+export LITELLM_API_KEY=proxy-key
+export PLANNER_MODEL=huggingface/meta-llama/Meta-Llama-3-8B-Instruct
+export TASK_SPLITTER_MODEL=huggingface/meta-llama/Meta-Llama-3-8B-Instruct
+export COORDINATOR_MODEL=huggingface/meta-llama/Meta-Llama-3-8B-Instruct
+```
+3) Run as usual: `uv run main.py "your query"`. If the proxy/model does not support streaming, set `PLANNER_STREAM=false`.
 
 ## Run
-- `uv run main.py`
-- Enter your query when prompted. The final consolidated report is written to `research_result.md`.
-
-## Workflow Diagram
-- The full workflow operates exactly as in the attached diagram: plan → tasks → coordinator → parallel sub‑agents → coordinator synthesis → final result. The coordinator and sub‑agents run on open HF‑hosted models via Inference Providers, and the agent framework is `smolagents` (HF).
+- CLI: `uv run main.py "your query"` (prompts if no arg). Output is written to `results/research_result.md`.
+- FastAPI: `uv run uvicorn api:app --reload --port 8000` then `curl -X POST http://localhost:8000/research -H "Content-Type: application/json" -d '{"query":"topic"}'`.
 
 ## File Map
 - `main.py`: CLI entry point that runs the pipeline and writes the final report.
-- `coordinator.py`: coordinator agent, sub‑agent tool, and MCP integration.
-- `planner.py`: research plan generation with HF Inference.
-- `task_splitter.py`: JSON‑schema‑validated task decomposition.
+- `coordinator.py`: coordinator agent, sub‑agent orchestration, and tool wiring.
+- `planner.py`: research plan generation (streaming OpenAI chat completions).
+- `task_splitter.py`: JSON‑schema‑validated task decomposition using OpenAI parsing.
+- `firecrawl_tools.py`: Firecrawl search/scrape tools exposed as agent functions.
 - `prompts.py`: prompt templates for planner, splitter, sub‑agents, and coordinator.
+- `api.py`: FastAPI endpoint for programmatic access.
+- `docs/`: assets including the workflow diagram.
+- `results/`: generated reports (created at runtime).
 
-## Notes
-- All agents share the same MCP toolset, ensuring consistent access to Firecrawl capabilities.
-- Swap model IDs to any open model available via HF providers to match your cost/quality constraints.
+![Open Deep Research Workflow Diagram](docs/open-deep-research-workflow-diagram.png)
