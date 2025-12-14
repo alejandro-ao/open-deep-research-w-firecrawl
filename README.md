@@ -9,6 +9,7 @@ The workflow mirrors the included diagram: generate plan → split into tasks �
 - LLM calls honor `OPENAI_BASE_URL` / `LITELLM_BASE_URL` so you can route to a LiteLLM proxy (e.g., Hugging Face models) or use OpenAI directly.
 - Firecrawl tools (`search_web`, `scrape_url`) are **implemented in-repo** (`firecrawl_tools.py`) rather than pulled from an MCP server.
 - Produces a consolidated markdown report saved to `results/research_result.md`.
+- Central config lives in `config.py` (models, streaming toggle, base URLs, API keys), and all prompts stay in `prompts.py`.
 
 ## How It Works
 - Plan generation: `planner.py` streams a high‑level research plan using an OpenAI chat model.
@@ -18,10 +19,10 @@ The workflow mirrors the included diagram: generate plan → split into tasks �
 - Synthesis: the coordinator gathers all sub‑agent outputs and creates the final report.
 
 ## Models & Providers
-- Planner model: `planner.py` (`MODEL = "gpt-5-mini-2025-08-07"`).
-- Task splitter model: `task_splitter.py` (`MODEL = "gpt-5-mini-2025-08-07"`).
-- Coordinator/Sub‑agents model: `coordinator.py` (`MODEL = "gpt-5.1"` via `LitellmModel`).
-- Swap these via env vars: `PLANNER_MODEL`, `TASK_SPLITTER_MODEL`, `COORDINATOR_MODEL`.
+- Planner model: `config.py` → `PLANNER_MODEL` (default `gpt-5-mini-2025-08-07`).
+- Task splitter model: `config.py` → `TASK_SPLITTER_MODEL` (default `gpt-5-mini-2025-08-07`).
+- Coordinator/Sub‑agents model: `config.py` → `COORDINATOR_MODEL` (default `gpt-5.1` via `LitellmModel`).
+- Swap via env vars (`PLANNER_MODEL`, `TASK_SPLITTER_MODEL`, `COORDINATOR_MODEL`) or edit `config.py`.
 
 ## Firecrawl Tools
 - Implemented locally in `firecrawl_tools.py` using the Firecrawl Python SDK.
@@ -41,6 +42,7 @@ The workflow mirrors the included diagram: generate plan → split into tasks �
   - `LITELLM_API_KEY`: optional; used by Agents SDK when talking through `LitellmModel` (defaults to `OPENAI_API_KEY` or `HF_TOKEN`).
   - `OPENAI_BASE_URL`: optional; set to your LiteLLM proxy so planner/splitter route through it.
   - `LITELLM_BASE_URL`: optional; set to the same proxy so Agents use it.
+  - `LLM_PROVIDER`: choose `openai` (default) or `litellm` to force Agents SDK to route via `LitellmModel`. Planner/splitter follow the same base URLs through the shared chat client.
 - Model selection: edit the `MODEL` constants or set env vars above.
 
 ## Using Hugging Face models via LiteLLM (Agents SDK integration)
@@ -54,6 +56,7 @@ export LITELLM_API_KEY=proxy-key
 export PLANNER_MODEL=huggingface/meta-llama/Meta-Llama-3-8B-Instruct
 export TASK_SPLITTER_MODEL=huggingface/meta-llama/Meta-Llama-3-8B-Instruct
 export COORDINATOR_MODEL=huggingface/meta-llama/Meta-Llama-3-8B-Instruct
+export LLM_PROVIDER=litellm
 ```
 3) Run as usual: `uv run main.py "your query"`. If the proxy/model does not support streaming, set `PLANNER_STREAM=false`.
 
