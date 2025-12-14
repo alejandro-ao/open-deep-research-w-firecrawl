@@ -2,12 +2,12 @@ import json
 import asyncio
 from agents import Agent, Runner, AgentHooks, RunContextWrapper, Tool
 from rich.console import Console
+from config import COORDINATOR_MODEL, LLM_PROVIDER, make_agent_model
 from planner import generate_research_plan
 from task_splitter import split_into_subtasks
 from prompts import SUBAGENT_PROMPT_TEMPLATE, SYNTHESIS_PROMPT_TEMPLATE
 from firecrawl_tools import search_web, scrape_url
 
-MODEL = "gpt-5.1"
 console = Console()
 
 
@@ -42,14 +42,14 @@ async def run_deep_research(user_query: str) -> str:
 
     # 3) Run all subagents concurrently
     print("Initializing Subagents")
-    print("Model: ", MODEL)
+    print("Coordinator/Sub-agent model: ", COORDINATOR_MODEL, f"(provider: {LLM_PROVIDER})")
 
     async def run_single_subagent(subtask: dict) -> dict:
         subtask_id = subtask["id"]
         subtask_title = subtask["title"]
         subtask_description = subtask["description"]
 
-        print(f"Starting Subagent for task {subtask_id}...")
+        print(f"Starting Subagent for task {subtask_id} with model {COORDINATOR_MODEL}...")
 
         subagent = Agent(
             name=f"subagent_{subtask_id}",
@@ -60,7 +60,7 @@ async def run_deep_research(user_query: str) -> str:
                 subtask_title=subtask_title,
                 subtask_description=subtask_description,
             ),
-            model=MODEL,
+            model=make_agent_model(COORDINATOR_MODEL),
             tools=[search_web, scrape_url],
             hooks=SubagentLoggingHooks(subtask_id),
         )
@@ -73,14 +73,14 @@ async def run_deep_research(user_query: str) -> str:
     subagent_results = await asyncio.gather(*[run_single_subagent(st) for st in subtasks])
 
     # 4) Synthesize results with a final agent
-    print("Synthesizing results...")
+    print(f"Synthesizing results with model {COORDINATOR_MODEL} (provider: {LLM_PROVIDER})...")
     synthesizer = Agent(
         name="synthesizer_agent",
         instructions=SYNTHESIS_PROMPT_TEMPLATE.format(
             user_query=user_query,
             research_plan=research_plan,
         ),
-        model=MODEL,
+        model=make_agent_model(COORDINATOR_MODEL),
     )
 
     synthesis_input = json.dumps(subagent_results, indent=2, ensure_ascii=False)

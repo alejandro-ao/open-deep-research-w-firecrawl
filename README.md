@@ -42,7 +42,7 @@ The workflow mirrors the included diagram: generate plan → split into tasks �
   - `LITELLM_API_KEY`: optional; used by Agents SDK when talking through `LitellmModel` (defaults to `OPENAI_API_KEY` or `HF_TOKEN`).
   - `OPENAI_BASE_URL`: optional; set to your LiteLLM proxy so planner/splitter route through it.
   - `LITELLM_BASE_URL`: optional; set to the same proxy so Agents use it.
-  - `LLM_PROVIDER`: choose `openai` (default) or `litellm` to force Agents SDK to route via `LitellmModel`. Planner/splitter follow the same base URLs through the shared chat client.
+  - `LLM_PROVIDER`: choose `openai` (default) or `litellm` to route Agents SDK (sub‑agents/synth) via `LitellmModel`. Planner/splitter always use the OpenAI client with `OPENAI_*`.
 - Model selection: edit the `MODEL` constants or set env vars above.
 
 ## Using Hugging Face models via LiteLLM (Agents SDK integration)

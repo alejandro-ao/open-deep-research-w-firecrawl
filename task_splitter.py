@@ -1,9 +1,7 @@
 from typing import List
 from pydantic import BaseModel, Field
-from openai import OpenAI
+from config import TASK_SPLITTER_MODEL, make_openai_client
 from prompts import TASK_SPLITTER_SYSTEM_INSTRUCTIONS
-
-MODEL = "gpt-5-mini-2025-08-07"
 
 
 class Subtask(BaseModel):
@@ -30,11 +28,11 @@ class SubtaskList(BaseModel):
 
 def split_into_subtasks(research_plan: str) -> List[dict]:
     print("Splitting the research plan into subtasks...")
-    print("MODEL: ", MODEL)
+    print("Task splitter model: ", TASK_SPLITTER_MODEL)
 
-    client = OpenAI()
+    client = make_openai_client()
     completion = client.beta.chat.completions.parse(
-        model=MODEL,
+        model=TASK_SPLITTER_MODEL,
         messages=[
             {"role": "system", "content": TASK_SPLITTER_SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": research_plan},

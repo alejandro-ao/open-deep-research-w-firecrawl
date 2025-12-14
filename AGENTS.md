@@ -4,7 +4,7 @@
 - `main.py`: CLI entry; loads `.env`, accepts a query, calls `run_deep_research`, and writes `results/research_result.md`.
 - `coordinator.py`: Orchestrates planner, splitter, concurrent sub-agents, and final synthesis via the OpenAI Agents SDK (`Agent`, `Runner`, hooks).
 - `planner.py` / `task_splitter.py`: Chat completions that draft the plan and turn it into structured subtasks; model IDs live at the top of each file.
-- `config.py`: Central place for model IDs, streaming toggle, provider selection (`LLM_PROVIDER=openai|litellm`), and LiteLLM/OpenAI base URLs/API keys (factories for chat client and agent models).
+- `config.py`: Central place for model IDs, streaming toggle, provider selection (`LLM_PROVIDER=openai|litellm`), OpenAI base URL/API key for simple calls, and LiteLLM settings for agent calls (factories for chat client and agent models).
 - `prompts.py`: Single source for all system/agent prompts.
 - `firecrawl_tools.py`: Tool wrappers (`search_web`, `scrape_url`) that require `FIRECRAWL_API_KEY`.
 - `api.py`: FastAPI surface (`/research`). Docs/assets in `docs/`; generated outputs in `results/`.
@@ -15,7 +15,7 @@
 - Run API: `uv run uvicorn api:app --reload --port 8000` then `curl -X POST http://localhost:8000/research -H "Content-Type: application/json" -d '{"query":"topic"}'`.
 - Env loading: keep `OPENAI_API_KEY` and `FIRECRAWL_API_KEY` in `.env`; both entry points call `load_dotenv()`.
 - LiteLLM/HF: set `OPENAI_BASE_URL` and `LITELLM_BASE_URL` to your proxy (e.g., `http://localhost:4000`), set `OPENAI_API_KEY`/`LITELLM_API_KEY` to the proxy key, and override `PLANNER_MODEL` / `TASK_SPLITTER_MODEL` / `COORDINATOR_MODEL` with HF model IDs.
-- Provider toggle: default is `LLM_PROVIDER=openai`. Set `LLM_PROVIDER=litellm` to force Agents SDK to use `LitellmModel`; planner/splitter will still honor the same base URLs via the shared chat client factory.
+- Provider toggle: default is `LLM_PROVIDER=openai`. Set `LLM_PROVIDER=litellm` to force Agents SDK to use `LitellmModel`; planner/splitter always use the OpenAI client (`OPENAI_*`).
 
 ## Coding Style & Naming Conventions
 - Python 3.11, PEP 8, 4-space indent. Use `snake_case` for functions/vars, `CapWords` for classes, uppercase for constants (model IDs, paths).
