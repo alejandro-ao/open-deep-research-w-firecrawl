@@ -14,8 +14,8 @@ def _as_bool(val: str, default: bool = False) -> bool:
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
 
 # Model IDs (override via env)
-PLANNER_MODEL = os.getenv("PLANNER_MODEL", "gpt-5-mini-2025-08-07")
-TASK_SPLITTER_MODEL = os.getenv("TASK_SPLITTER_MODEL", "gpt-5-mini-2025-08-07")
+PLANNER_MODEL = os.getenv("PLANNER_MODEL", "gpt-5.1")
+TASK_SPLITTER_MODEL = os.getenv("TASK_SPLITTER_MODEL", "gpt-5.1")
 COORDINATOR_MODEL = os.getenv("COORDINATOR_MODEL", "gpt-5.1")
 
 # Behavior toggles

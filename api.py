@@ -19,5 +19,5 @@ class ResearchResponse(BaseModel):
 @app.post("/research", response_model=ResearchResponse)
 async def research(request: ResearchRequest):
     """Run deep research on the given query. May take several minutes."""
-    result = run_deep_research(request.query)
+    result = await run_deep_research(request.query)
     return ResearchResponse(result=result)

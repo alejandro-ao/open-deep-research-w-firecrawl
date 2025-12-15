@@ -25,9 +25,8 @@ class SubagentLoggingHooks(AgentHooks):
     async def on_tool_end(
         self, context: RunContextWrapper, agent: Agent, tool: Tool, result: str
     ) -> None:
-        # preview = result[:80] + "..." if len(result) > 80 else result
-        # preview = preview.replace("\n", " ")
-        preview = result
+        preview = result[:80] + "..." if len(result) > 80 else result
+        preview = preview.replace("\n", " ")
         console.print(f"  [cyan][{self.subtask_id}][/cyan] [dim]<- result:[/dim] [dim]{preview}[/dim]")
 
 
