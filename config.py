@@ -17,8 +17,8 @@ PLANNER_PROVIDER = "auto"
 # =============================================================================
 # TASK SPLITTER - decomposes plan into subtasks
 # =============================================================================
-TASK_SPLITTER_MODEL_ID = "deepseek-ai/DeepSeek-V3.2-Exp"
-TASK_SPLITTER_PROVIDER = "novita"
+TASK_SPLITTER_MODEL_ID = "openai/gpt-oss-120b"
+TASK_SPLITTER_PROVIDER = "together"
 
 # =============================================================================
 # COORDINATOR - orchestrates sub-agents, synthesizes final report
