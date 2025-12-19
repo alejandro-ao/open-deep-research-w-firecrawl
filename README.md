@@ -1,21 +1,44 @@
 # Firecrawl + Smolagents Deep Research (Multi‑Agent)
 
-Deep‑research system that takes a user query, plans the work, splits it into focused subtasks, and orchestrates specialized sub‑agents to investigate each part. A coordinator agent synthesizes all findings into a single, well‑structured report.
+> **Branch: `concurrent-smolagents-scaffold`** — Enhanced coordinator with concurrent execution
 
-The workflow mirrors the diagram you attached: generate plan → split into tasks → coordinator spawns sub‑agents → sub‑agents research → coordinator aggregates → final result.
+Deep‑research system that takes a user query, plans the work, splits it into focused subtasks, and orchestrates specialized sub‑agents to investigate each part. A chief editor agent synthesizes all findings into a single, well‑structured report.
+
+## Key Differences from Main Branch
+
+This branch implements significant improvements over `main`:
+
+### 1. **Concurrent Subagent Execution**
+- Subagents run in parallel using `ThreadPoolExecutor` instead of sequentially
+- Dramatically reduces total research time for multi-subtask queries
+- All subagents execute simultaneously while maintaining result consistency
+
+### 2. **Chief Editor Agent for Synthesis**
+- Final synthesis uses a full `CodeAgent` (chief editor) instead of simple LLM completion
+- Chief editor has access to web search tools (`search_web`, `scrape_url`) for fact-checking
+- Can validate claims, verify information, and fill gaps discovered during synthesis
+- Acts as true editorial oversight with independent research capabilities
+
+### 3. **Structured Report Persistence**
+- Each research run creates a timestamped directory in `reports/`
+- Final report saved as `final_report.md`
+- All subagent reports archived in `subagents/` subdirectory
+- Complete audit trail and reproducibility
+
+**Workflow:** generate plan → split into tasks → **concurrent subagents** → **chief editor validation & synthesis** → final result + archive
 
 ## Highlights
 - Built on `smolagents` (by Hugging Face) for agent orchestration and tool calling.
 - All LLM calls run via Hugging Face Inference Providers using open models.
 - Uses Firecrawl MCP tools for web research and retrieval.
-- Produces a consolidated markdown report saved to `research_result.md`.
+- Produces a consolidated markdown report with full research archive in `reports/YYYYMMDD_HHMMSS/`.
 
 ## How It Works
 - Plan generation: `planner.py:5` creates a high‑level research plan using an HF Inference model.
 - Task splitting: `task_splitter.py:35` turns the plan into clear, non‑overlapping subtasks (JSON schema enforced).
-- Coordinator: `coordinator.py:15` orchestrates the workflow and exposes the tool `initialize_subagent(...)` to spawn focused sub‑agents with shared MCP tools.
-- Sub‑agents: created inside `coordinator.py:46`, each runs a targeted prompt and returns a markdown report.
-- Synthesis: the coordinator gathers all sub‑agent outputs and creates the final report.
+- Coordinator: `coordinator.py:15` orchestrates the workflow with concurrent execution.
+- Sub‑agents: `coordinator.py:46` spawns multiple agents that run in parallel via `ThreadPoolExecutor`, each producing a targeted markdown report.
+- Chief Editor: `coordinator.py:116` uses a full `CodeAgent` with web search tools to validate, fact-check, and synthesize all findings into the final report.
 
 ![Open Deep Research Workflow Diagram](docs/open-deep-research-workflow-diagram.png)
 
@@ -46,10 +69,10 @@ The workflow mirrors the diagram you attached: generate plan → split into task
 
 ## Run
 - `uv run main.py`
-- Enter your query when prompted. The final consolidated report is written to `research_result.md`.
+- Enter your query when prompted. The final consolidated report and all subagent reports are written to `reports/YYYYMMDD_HHMMSS/`.
 
 ## Workflow Diagram
-- The full workflow operates exactly as in the attached diagram: plan → tasks → coordinator → parallel sub‑agents → coordinator synthesis → final result. The coordinator and sub‑agents run on open HF‑hosted models via Inference Providers, and the agent framework is `smolagents` (HF).
+- The workflow: plan → tasks → coordinator → **parallel sub‑agents** → **chief editor synthesis** → final result. All agents run on open HF‑hosted models via Inference Providers using the `smolagents` framework.
 
 ## File Map
 - `main.py`: CLI entry point that runs the pipeline and writes the final report.
@@ -58,9 +81,8 @@ The workflow mirrors the diagram you attached: generate plan → split into task
 - `task_splitter.py`: JSON‑schema‑validated task decomposition.
 - `prompts.py`: prompt templates for planner, splitter, sub‑agents, and coordinator.
 
-## Going Deeper
-Want to explore advanced implementations? Check out these branches:
-- **`concurrent-smolagents-scaffold`**: Concurrent sub-agent execution for faster research
+## Other Branches
+- **`main`**: Sequential subagent execution with simple LLM synthesis
 - **`openai-agents-scaffold`**: Migration to OpenAI Agents SDK
 
 ## Notes
