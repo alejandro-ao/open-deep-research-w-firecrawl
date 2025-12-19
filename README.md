@@ -58,6 +58,11 @@ The workflow mirrors the diagram you attached: generate plan → split into task
 - `task_splitter.py`: JSON‑schema‑validated task decomposition.
 - `prompts.py`: prompt templates for planner, splitter, sub‑agents, and coordinator.
 
+## Going Deeper
+Want to explore advanced implementations? Check out these branches:
+- **`concurrent-smolagents-scaffold`**: Concurrent sub-agent execution for faster research
+- **`openai-agents-scaffold`**: Migration to OpenAI Agents SDK
+
 ## Notes
 - All agents share the same MCP toolset, ensuring consistent access to Firecrawl capabilities.
 - Swap model IDs to any open model available via HF providers to match your cost/quality constraints.
